@@ -31,10 +31,10 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         });
 
         // If other user requests to restart, ask user if they want to restart
-        socket.on("restart-game-server-request", (room) => {
+        socket.on("restart-game-server-request", ({ username, room }) => {
             Swal.fire({
                 title: "Restart Game?",
-                text: "Other player has requested to restart the game",
+                text: `${username} has requested to restart the game`,
                 icon: "question",
                 showCancelButton: true,
                 confirmButtonText: "Yes",
@@ -42,13 +42,14 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             }).then((result) => {
                 if (result.isConfirmed) {
                     socket.emit("restart-game-accepted", {
-                        room: inRoom.room,
+                        room: room,
                     });
                 }
 
                 // If user declines, let other user know
                 else {
                     socket.emit("restart-game-declined", {
+                        username: inRoom.player,
                         room: inRoom.room,
                     });
                 }
@@ -63,16 +64,16 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         });
 
         // If other user declines restart, let user know
-        socket.on("restart-game-declined", () => {
+        socket.on("restart-game-declined", (username) => {
             setRestartGameText("Restart Game");
-            toastr.error("Other player declined to restart the game");
+            toastr.error(`${username} has declined to restart the game`);
         });
 
         // When a user leaves, let everyone know
         socket.on("player-left", (name) => {
             toastr.error(`${name} has left the game`);
         });
-    }, [setInRoom, socket]);
+    }, [setInRoom, socket, inRoom, initialBoard]);
 
     const nextPlayer = () => {
         return player === "X" ? "O" : "X";
@@ -136,6 +137,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
     const resetGame = () => {
         socket.emit("restart-game-request", {
+            username: inRoom.player,
             room: inRoom.room,
         });
 
