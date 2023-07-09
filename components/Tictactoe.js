@@ -11,11 +11,21 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
     const initialBoard = Array(9).fill("");
     const [board, setBoard] = useState(initialBoard);
-    const [player, setPlayer] = useState("X");
+    const [player, setPlayer] = useState("X"); // Updated to initialize as null
     const [winner, setWinner] = useState(null);
     const [restartGameText, setRestartGameText] = useState("Restart Game");
+    const [gameReady, setGameReady] = useState(false); // Updated to initialize as false
 
     useEffect(() => {
+        socket.on("users-count", (usersCount) => {
+            setGameReady(usersCount === 2);
+        });
+        // When a user joins, let everyone know and receive player symbol
+        socket.on("player-joined", ({ username, playerSymbol }) => {
+            toastr.success(`${username} has joined the game`);
+            setPlayer(playerSymbol);
+        });
+
         // If server allows user to leave, set inRoom state
         socket.on("left", ({ name, room }) => {
             setInRoom({
@@ -23,11 +33,6 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                 room: null,
                 player: null,
             });
-        });
-
-        // When a user joins, let everyone know
-        socket.on("player-joined", (name) => {
-            toastr.success(`${name} has joined the game`);
         });
 
         // If other user requests to restart, ask user if they want to restart
@@ -168,54 +173,77 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     }, [board]);
 
     return (
-        <div className="min-h-screen  flex justify-center items-center">
-            <div className="w-72 bg-white rounded-lg shadow-lg p-6">
-                <div className="text-4xl font-bold text-center mb-4 text-gray-800">
-                    XOXO
-                    <div className="text-sm font-normal">
-                        Room: {inRoom.room} | Player: {inRoom.player}
+        <>
+            {gameReady ? (
+                <div className="min-h-screen  flex justify-center items-center">
+                    <div className="w-72 bg-white rounded-lg shadow-lg p-6">
+                        <div className="text-4xl font-bold text-center mb-4 text-gray-800">
+                            XOXO
+                            <div className="text-sm font-normal">
+                                Room: {inRoom.room} | Player: {inRoom.player}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                            {board.map((square, index) => (
+                                <div
+                                    key={index}
+                                    className={`bg-blue-500 hover:bg-blue-600 text-white rounded-lg h-20 flex justify-center items-center cursor-pointer text-6xl font-bold ${
+                                        square === "X"
+                                            ? "text-blue-900"
+                                            : "text-red-500"
+                                    }`}
+                                    onClick={() => handleClick(index)}
+                                >
+                                    {square}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="text-2xl font-bold text-center mt-4 text-gray-800">
+                            {winner
+                                ? winner === "draw"
+                                    ? "It's a draw!"
+                                    : `Player ${winner} wins!`
+                                : `Player ${player}'s turn`}
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                            <button
+                                className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md w-full"
+                                onClick={resetGame}
+                            >
+                                {restartGameText}
+                            </button>
+                            <button
+                                className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md w-full"
+                                onClick={handleLeaveRoom}
+                            >
+                                Leave Room
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                    {board.map((square, index) => (
-                        <div
-                            key={index}
-                            className={`bg-blue-500 hover:bg-blue-600 text-white rounded-lg h-20 flex justify-center items-center cursor-pointer text-6xl font-bold ${
-                                square === "X"
-                                    ? "text-blue-900"
-                                    : "text-red-500"
-                            }`}
-                            onClick={() => handleClick(index)}
-                        >
-                            {square}
+            ) : (
+                <div className="min-h-screen  flex justify-center items-center">
+                    <div className="w-72 bg-white rounded-lg shadow-lg p-6">
+                        <div className="text-4xl font-bold text-center mb-4 text-gray-800">
+                            XOXO
                         </div>
-                    ))}
+                        <div className="text-center text-gray-800">
+                            Waiting for other player...
+                        </div>
+                        <div className="mt-4 space-y-4">
+                            <button
+                                className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md w-full"
+                                onClick={handleLeaveRoom}
+                            >
+                                Leave Room
+                            </button>
+                        </div>
+                    </div>
                 </div>
-
-                <div className="text-2xl font-bold text-center mt-4 text-gray-800">
-                    {winner
-                        ? winner === "draw"
-                            ? "It's a draw!"
-                            : `Player ${winner} wins!`
-                        : `Player ${player}'s turn`}
-                </div>
-
-                <div className="mt-4 space-y-4">
-                    <button
-                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md w-full"
-                        onClick={resetGame}
-                    >
-                        {restartGameText}
-                    </button>
-                    <button
-                        className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md w-full"
-                        onClick={handleLeaveRoom}
-                    >
-                        Leave Room
-                    </button>
-                </div>
-            </div>
-        </div>
+            )}
+        </>
     );
 };
 

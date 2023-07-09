@@ -63,6 +63,11 @@ const Joinroom = ({ setInRoom }) => {
                             placeholder="Username"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleJoin();
+                                }
+                            }}
                         />
                     </div>
                     <div className="mb-4">
@@ -79,6 +84,11 @@ const Joinroom = ({ setInRoom }) => {
                             placeholder="Room"
                             value={room}
                             onChange={(e) => setRoom(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleJoin();
+                                }
+                            }}
                         />
                     </div>
                     <button
