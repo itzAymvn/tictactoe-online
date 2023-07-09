@@ -11,7 +11,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
     const initialBoard = Array(9).fill("");
     const [board, setBoard] = useState(initialBoard);
-    const [player, setPlayer] = useState("X"); // Updated to initialize as null
+    const [player, setPlayer] = useState("X");
     const [winner, setWinner] = useState(null);
     const [restartGameText, setRestartGameText] = useState("Restart Game");
     const [gameReady, setGameReady] = useState(false); // Updated to initialize as false
@@ -20,10 +20,9 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         socket.on("users-count", (usersCount) => {
             setGameReady(usersCount === 2);
         });
-        // When a user joins, let everyone know and receive player symbol
-        socket.on("player-joined", ({ username, playerSymbol }) => {
+        // When a user joins, let everyone know
+        socket.on("player-joined", ({ username }) => {
             toastr.success(`${username} has joined the game`);
-            setPlayer(playerSymbol);
         });
 
         // If server allows user to leave, set inRoom state
@@ -66,6 +65,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             setBoard(initialBoard);
             setWinner(null);
             setRestartGameText("Restart Game");
+            toastr.success("Game has been restarted");
         });
 
         // If other user declines restart, let user know

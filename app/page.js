@@ -11,6 +11,7 @@ const page = () => {
         status: false,
         room: null,
         player: null,
+        symbol: null,
     });
 
     return (
