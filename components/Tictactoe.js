@@ -20,6 +20,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     const [message, setMessage] = useState("");
     useEffect(() => {
         socket.on("users-count", (users) => {
+            toastr.info(`There are ${users.length} players in the room`);
             setGameReady(users.length === 2);
             setPlayers(users);
 
@@ -144,6 +145,9 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
         // When a message is sent, add it to the messages array
         socket.on("new-message", ({ username, message, timestamp }) => {
+            if (username !== inRoom.player) {
+                toastr.info(`${username} has sent a message`);
+            }
             setMessages((messages) => [
                 ...messages,
                 {
@@ -222,7 +226,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     return (
         <>
             {gameReady ? (
-                <div className="min-h-screen flex justify-center items-center gap-4 sm:flex-row flex-col p-4">
+                <div className="min-h-screen flex justify-center items-center gap-4 sm:flex-row flex-col p-4 w-full">
                     <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3">
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">
                             XOXO
@@ -316,7 +320,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             </button>
                         </div>
                     </div>
-                    <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3">
+                    <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3 flex flex-col justify-between">
                         <h2 className="text-2xl font-bold text-center text-gray-800">
                             Chat
                         </h2>
@@ -387,11 +391,11 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                 <div className="flex items-center mt-4">
                                     <input
                                         type="text"
-                                        className="flex-grow bg-gray-200 rounded-lg py-2 px-4 focus:outline-none"
+                                        className="flex-grow bg-gray-200 rounded-lg py-2 px-4 focus:outline-none w-full"
                                         placeholder="Enter your message..."
                                         value={message}
                                         onChange={(e) =>
-                                            setMessage(e.target.value.trim())
+                                            setMessage(e.target.value)
                                         }
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter")
@@ -399,7 +403,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                         }}
                                     />
                                     <button
-                                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-4"
+                                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-2"
                                         onClick={sendMessage}
                                     >
                                         Send
