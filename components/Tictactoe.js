@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import SocketContext from "@/context/SocketContext";
 import Swal from "sweetalert2";
 import toastr from "toastr";
@@ -8,30 +8,26 @@ import "toastr/build/toastr.min.css";
 
 const TicTacToe = ({ inRoom, setInRoom }) => {
     const socket = useContext(SocketContext);
+    const messagesContainerRef = useRef(null);
 
     const initialBoard = Array(9).fill("");
     const [board, setBoard] = useState(initialBoard);
     const [restartGameText, setRestartGameText] = useState("Restart Game");
     const [gameReady, setGameReady] = useState(false); // Updated to initialize as false
-    const [playerTurn, setPlayerTurn] = useState(false);
-    const [playerTurnUsername, setPlayerTurnUsername] = useState("");
+    const [playerTurn, setPlayerTurn] = useState("");
     const [players, setPlayers] = useState([]);
-
+    const [messages, setMessages] = useState([]);
+    const [message, setMessage] = useState("");
     useEffect(() => {
-        if (playerTurn) {
-            setPlayerTurnUsername(inRoom.player);
-        }
-    }, [playerTurn]);
-
-    useEffect(() => {
-        socket.on("turn", (username) => {
-            setPlayerTurn(username === inRoom.player);
-        });
-
         socket.on("users-count", (users) => {
             setGameReady(users.length === 2);
-
             setPlayers(users);
+
+            // If a user leaves, clear chat & board
+            if (users.length === 1) {
+                setMessages([]);
+                setBoard(initialBoard);
+            }
         });
         // When a user joins, let everyone know
         socket.on("player-joined", (username) => {
@@ -78,6 +74,14 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             setBoard(initialBoard);
             setRestartGameText("Restart Game");
             toastr.success("Game has been restarted");
+            setMessages((messages) => [
+                ...messages,
+                {
+                    username: "Server",
+                    message: "Game has been restarted",
+                    timestamp: new Date(),
+                },
+            ]);
         });
 
         // If other user declines restart, let user know
@@ -97,7 +101,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
         // Turn event
         socket.on("turn", (username) => {
-            setPlayerTurn(username === inRoom.player);
+            setPlayerTurn(username);
         });
 
         // When a user wins, let everyone know
@@ -138,6 +142,24 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             });
         });
 
+        // When a message is sent, add it to the messages array
+        socket.on("new-message", ({ username, message, timestamp }) => {
+            setMessages((messages) => [
+                ...messages,
+                {
+                    username: username,
+                    message: message,
+                    timestamp: timestamp,
+                },
+            ]);
+
+            // use scrollIntoView to scroll to the bottom of the messages container
+            messagesContainerRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "end",
+            });
+        });
+
         return () => {
             socket.off("player-joined");
             socket.off("left");
@@ -149,8 +171,36 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             socket.off("restart-game-server-request");
             socket.off("restart-game-accepted");
             socket.off("restart-game-declined");
+            socket.off("users-count");
+            socket.off("new-message");
         };
-    }, [setInRoom, socket, inRoom, initialBoard, setPlayers]);
+    }, [
+        setInRoom,
+        socket,
+        inRoom,
+        initialBoard,
+        setPlayers,
+        setGameReady,
+        setPlayerTurn,
+        setBoard,
+        restartGameText,
+    ]);
+
+    // Send message
+    const sendMessage = () => {
+        if (message.trim() === "") {
+            return;
+        }
+
+        socket.emit("send-message", {
+            username: inRoom.player,
+            message: message,
+            room: inRoom.room,
+            timestamp: new Date(),
+        });
+
+        setMessage("");
+    };
 
     // Request to leave room
     const handleLeaveRoom = () => {
@@ -172,8 +222,8 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     return (
         <>
             {gameReady ? (
-                <div className="min-h-screen  flex justify-center items-center">
-                    <div className="w-100 bg-white rounded-lg shadow-lg p-6">
+                <div className="min-h-screen flex justify-center items-center gap-4 sm:flex-row flex-col p-4">
+                    <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3">
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">
                             XOXO
                             <div className="text-sm font-normal">
@@ -181,17 +231,21 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             </div>
                         </div>
 
-                        <div className="flex justify-center items-center mb-4 w-full gap-4">
+                        <div className="flex justify-center items-center mb-4 gap-4">
                             {players.map((player, index) => (
                                 <div
                                     key={index}
                                     className={`flex items-center bg-gray-200 rounded-lg p-2 w-1/2 justify-center
-                                  
-                                    ${
-                                        player.symbol === "X"
-                                            ? "text-blue-900"
-                                            : "text-red-500"
-                                    }`}
+                                ${
+                                    playerTurn === player.username
+                                        ? "border-2 border-blue-500"
+                                        : ""
+                                }
+                                ${
+                                    player.symbol === "X"
+                                        ? "text-blue-900"
+                                        : "text-red-500"
+                                }`}
                                 >
                                     <div className="text-2xl font-bold mr-2">
                                         {player.symbol}
@@ -211,7 +265,8 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                     }`}
                                     // If it's the player's turn, allow them to click
                                     onClick={() => {
-                                        if (!playerTurn) return;
+                                        if (playerTurn !== inRoom.player)
+                                            return;
 
                                         if (square !== "") return;
 
@@ -240,7 +295,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             </div>
 
                             <div className="text-sm font-normal">
-                                {playerTurn
+                                {playerTurn === inRoom.player
                                     ? "Your turn"
                                     : "Waiting for other player to play"}
                             </div>
@@ -259,6 +314,98 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             >
                                 Leave Room
                             </button>
+                        </div>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3">
+                        <h2 className="text-2xl font-bold text-center text-gray-800">
+                            Chat
+                        </h2>
+                        <div className="flex flex-col h-full">
+                            <div
+                                className="overflow-y-auto"
+                                style={{ maxHeight: "400px" }}
+                            >
+                                {/* Messages container */}
+                                <div
+                                    className="flex flex-col p-4"
+                                    id="messages"
+                                    ref={messagesContainerRef} // Add the ref to the messages container
+                                >
+                                    {messages.map((message, index) => (
+                                        <div
+                                            key={index}
+                                            className={`flex items-center mb-4 w-full
+                                            ${
+                                                message.username === "Server" &&
+                                                "justify-center"
+                                            }
+                                            ${
+                                                message.username ===
+                                                inRoom.player
+                                                    ? "justify-start"
+                                                    : "justify-end"
+                                            }`}
+                                        >
+                                            <div
+                                                className={`bg-gray-200 rounded-lg py-2 px-4 w-1/2 
+                                                ${
+                                                    message.username ===
+                                                    inRoom.player
+                                                        ? "bg-blue-500"
+                                                        : ""
+                                                }`}
+                                            >
+                                                {message.message}
+
+                                                <div className="text-xs font-normal text-gray-500 flex justify-between">
+                                                    <span className="mr-2">
+                                                        {message.username}
+                                                    </span>
+                                                    <span>
+                                                        {
+                                                            // HH:MM no PM/AM
+                                                            new Date(
+                                                                message.timestamp
+                                                            ).toLocaleTimeString(
+                                                                "en-US",
+                                                                {
+                                                                    hour: "2-digit",
+                                                                    minute: "2-digit",
+
+                                                                    hour12: false,
+                                                                }
+                                                            )
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="flex flex-col h-full">
+                                <div className="flex items-center mt-4">
+                                    <input
+                                        type="text"
+                                        className="flex-grow bg-gray-200 rounded-lg py-2 px-4 focus:outline-none"
+                                        placeholder="Enter your message..."
+                                        value={message}
+                                        onChange={(e) =>
+                                            setMessage(e.target.value.trim())
+                                        }
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter")
+                                                sendMessage();
+                                        }}
+                                    />
+                                    <button
+                                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-4"
+                                        onClick={sendMessage}
+                                    >
+                                        Send
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -19,6 +19,16 @@ const Joinroom = ({ setInRoom }) => {
             return;
         }
 
+        if (username.length > 10) {
+            alert("Username must be less than 10 characters");
+            return;
+        }
+
+        if (username.split(" ").length > 1) {
+            alert("Username must not contain spaces");
+            return;
+        }
+
         socket.emit("join-room", { username, room });
     };
 
@@ -63,7 +73,7 @@ const Joinroom = ({ setInRoom }) => {
                             type="text"
                             placeholder="Username"
                             value={username}
-                            onChange={(e) => setUsername(e.target.value)}
+                            onChange={(e) => setUsername(e.target.value.trim())}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                     handleJoin();
