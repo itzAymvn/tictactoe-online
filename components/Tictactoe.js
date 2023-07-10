@@ -11,22 +11,35 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
     const initialBoard = Array(9).fill("");
     const [board, setBoard] = useState(initialBoard);
-    const [player, setPlayer] = useState("X");
-    const [winner, setWinner] = useState(null);
     const [restartGameText, setRestartGameText] = useState("Restart Game");
     const [gameReady, setGameReady] = useState(false); // Updated to initialize as false
+    const [playerTurn, setPlayerTurn] = useState(false);
+    const [playerTurnUsername, setPlayerTurnUsername] = useState("");
+    const [players, setPlayers] = useState([]);
 
     useEffect(() => {
-        socket.on("users-count", (usersCount) => {
-            setGameReady(usersCount === 2);
+        if (playerTurn) {
+            setPlayerTurnUsername(inRoom.player);
+        }
+    }, [playerTurn]);
+
+    useEffect(() => {
+        socket.on("turn", (username) => {
+            setPlayerTurn(username === inRoom.player);
+        });
+
+        socket.on("users-count", (users) => {
+            setGameReady(users.length === 2);
+
+            setPlayers(users);
         });
         // When a user joins, let everyone know
-        socket.on("player-joined", ({ username }) => {
+        socket.on("player-joined", (username) => {
             toastr.success(`${username} has joined the game`);
         });
 
         // If server allows user to leave, set inRoom state
-        socket.on("left", ({ name, room }) => {
+        socket.on("left", () => {
             setInRoom({
                 status: false,
                 room: null,
@@ -63,7 +76,6 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         // If other user accepts restart, restart game
         socket.on("restart-game-accepted", () => {
             setBoard(initialBoard);
-            setWinner(null);
             setRestartGameText("Restart Game");
             toastr.success("Game has been restarted");
         });
@@ -78,59 +90,67 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         socket.on("player-left", (name) => {
             toastr.error(`${name} has left the game`);
         });
-    }, [setInRoom, socket, inRoom, initialBoard]);
 
-    const nextPlayer = () => {
-        return player === "X" ? "O" : "X";
-    };
+        socket.on("update-board", ({ board, symbol }) => {
+            setBoard(board);
+        });
 
-    const winningPositions = [
-        // Rows
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        // Columns
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        // Diagonals
-        [0, 4, 8],
-        [2, 4, 6],
-    ];
+        // Turn event
+        socket.on("turn", (username) => {
+            setPlayerTurn(username === inRoom.player);
+        });
 
-    const checkWinner = () => {
-        for (let i = 0; i < winningPositions.length; i++) {
-            const [a, b, c] = winningPositions[i];
-            if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-                return board[a];
+        // When a user wins, let everyone know
+        socket.on("winner", (username) => {
+            if (username === inRoom.player) {
+                Swal.fire({
+                    title: "You Won!",
+                    text: "Congratulations, you won the game",
+                    icon: "success",
+                    confirmButtonText: "Ok",
+                }).then(() => {
+                    resetGame();
+                });
             }
-        }
 
-        // If the whole board is filled and no winner, it's a draw
-        if (board.every((square) => square !== "")) {
-            return "draw";
-        }
+            // If user loses, let them know
+            else {
+                Swal.fire({
+                    title: "You Lost!",
+                    text: "You lost the game",
+                    icon: "error",
+                    confirmButtonText: "Ok",
+                }).then(() => {
+                    resetGame();
+                });
+            }
+        });
 
-        // If no winner, and not a draw, return null
-        return null;
-    };
+        // When a draw happens, let everyone know
+        socket.on("draw", () => {
+            Swal.fire({
+                title: "Draw!",
+                text: "The game has ended in a draw",
+                icon: "info",
+                confirmButtonText: "Ok",
+            }).then(() => {
+                resetGame();
+            });
+        });
 
-    const handleClick = (index) => {
-        // If there's a winner, or the square is already filled, do nothing
-        if (winner || board[index] !== "") return;
-
-        const updatedBoard = [...board];
-        updatedBoard[index] = player;
-        setBoard(updatedBoard);
-
-        const currentWinner = checkWinner();
-        if (currentWinner) {
-            setWinner(currentWinner);
-            showWinnerAlert(currentWinner);
-        } else {
-            setPlayer(nextPlayer());
-        }
-    };
+        return () => {
+            socket.off("player-joined");
+            socket.off("left");
+            socket.off("player-left");
+            socket.off("update-board");
+            socket.off("turn");
+            socket.off("winner");
+            socket.off("draw");
+            socket.off("restart-game-server-request");
+            socket.off("restart-game-accepted");
+            socket.off("restart-game-declined");
+        };
+    }, [setInRoom, socket, inRoom, initialBoard, setPlayers]);
 
     // Request to leave room
     const handleLeaveRoom = () => {
@@ -149,39 +169,36 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         setRestartGameText("Waiting...");
     };
 
-    const showWinnerAlert = (currentWinner) => {
-        Swal.fire({
-            icon: currentWinner === "draw" ? "info" : "success",
-            title:
-                currentWinner === "draw"
-                    ? "It's a draw!"
-                    : `Player ${currentWinner} wins!`,
-            confirmButtonText: "Restart Game",
-        }).then((result) => {
-            if (result.isConfirmed) {
-                resetGame();
-            }
-        });
-    };
-
-    useEffect(() => {
-        const currentWinner = checkWinner();
-        if (currentWinner) {
-            setWinner(currentWinner);
-            showWinnerAlert(currentWinner);
-        }
-    }, [board]);
-
     return (
         <>
             {gameReady ? (
                 <div className="min-h-screen  flex justify-center items-center">
-                    <div className="w-72 bg-white rounded-lg shadow-lg p-6">
+                    <div className="w-100 bg-white rounded-lg shadow-lg p-6">
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">
                             XOXO
                             <div className="text-sm font-normal">
                                 Room: {inRoom.room} | Player: {inRoom.player}
                             </div>
+                        </div>
+
+                        <div className="flex justify-center items-center mb-4 w-full gap-4">
+                            {players.map((player, index) => (
+                                <div
+                                    key={index}
+                                    className={`flex items-center bg-gray-200 rounded-lg p-2 w-1/2 justify-center
+                                  
+                                    ${
+                                        player.symbol === "X"
+                                            ? "text-blue-900"
+                                            : "text-red-500"
+                                    }`}
+                                >
+                                    <div className="text-2xl font-bold mr-2">
+                                        {player.symbol}
+                                    </div>
+                                    <div>{player.username}</div>
+                                </div>
+                            ))}
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             {board.map((square, index) => (
@@ -192,22 +209,44 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                             ? "text-blue-900"
                                             : "text-red-500"
                                     }`}
-                                    onClick={() => handleClick(index)}
+                                    // If it's the player's turn, allow them to click
+                                    onClick={() => {
+                                        if (!playerTurn) return;
+
+                                        if (square !== "") return;
+
+                                        const newBoard = [...board];
+                                        newBoard[index] = inRoom.symbol;
+                                        setBoard(newBoard);
+
+                                        socket.emit("update-board", {
+                                            room: inRoom.room,
+                                            board: newBoard,
+                                            symbol: inRoom.symbol,
+                                        });
+                                    }}
                                 >
                                     {square}
                                 </div>
                             ))}
                         </div>
 
-                        <div className="text-2xl font-bold text-center mt-4 text-gray-800">
-                            {winner
-                                ? winner === "draw"
-                                    ? "It's a draw!"
-                                    : `Player ${winner} wins!`
-                                : `Player ${player}'s turn`}
+                        <div className="text-center text-gray-800 mt-4">
+                            <div className="text-sm font-normal">
+                                You are:{" "}
+                                <span className="font-bold">
+                                    {inRoom.symbol}
+                                </span>
+                            </div>
+
+                            <div className="text-sm font-normal">
+                                {playerTurn
+                                    ? "Your turn"
+                                    : "Waiting for other player to play"}
+                            </div>
                         </div>
 
-                        <div className="mt-4 space-y-4">
+                        <div className="mt-4 space-y-3">
                             <button
                                 className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md w-full"
                                 onClick={resetGame}
@@ -230,7 +269,16 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             XOXO
                         </div>
                         <div className="text-center text-gray-800">
-                            Waiting for other player...
+                            <div
+                                className="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-blue-600 rounded-full"
+                                role="status"
+                                aria-label="loading"
+                            >
+                                <span className="sr-only">Loading...</span>
+                            </div>
+                            <div className="text-sm font-normal">
+                                Waiting for another player...
+                            </div>
                         </div>
                         <div className="mt-4 space-y-4">
                             <button

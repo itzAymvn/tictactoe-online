@@ -24,20 +24,21 @@ const Joinroom = ({ setInRoom }) => {
 
     useEffect(() => {
         // If room is full, let user know
-        socket.on("room-full", () => {
+        socket.on("join-room-error", (error) => {
             Swal.fire({
                 icon: "error",
                 title: "Oops...",
-                text: "Room is full, please try another room or wait for someone to leave",
+                text: error,
             });
         });
 
         // if server allows user to join, set inRoom state
-        socket.on("joined", ({ username, room }) => {
+        socket.on("joined", ({ username, room, symbol }) => {
             setInRoom({
                 status: true,
                 room,
                 player: username,
+                symbol,
             });
         });
     }, [setInRoom, socket]);
