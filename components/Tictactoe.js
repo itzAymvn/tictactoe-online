@@ -4,6 +4,14 @@ import { useState, useEffect, useContext, useRef } from "react";
 import SocketContext from "@/context/SocketContext";
 import Swal from "sweetalert2";
 import toastr from "toastr";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+    faPaperPlane,
+    faRotateRight,
+    faCircleXmark,
+    faCheck,
+    faXmark,
+} from "@fortawesome/free-solid-svg-icons";
 import "toastr/build/toastr.min.css";
 
 const TicTacToe = ({ inRoom, setInRoom }) => {
@@ -18,7 +26,33 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     const [players, setPlayers] = useState([]);
     const [messages, setMessages] = useState([]);
     const [message, setMessage] = useState("");
+    const [typing, setTyping] = useState(false);
+
     useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            socket.emit("typing-stop", {
+                room: inRoom.room,
+            });
+        }, 1000);
+
+        return () => {
+            clearTimeout(delayDebounceFn);
+            socket.emit("typing", {
+                username: inRoom.player,
+                room: inRoom.room,
+            });
+        };
+    }, [message]);
+
+    useEffect(() => {
+        socket.on("typing", (username) => {
+            setTyping(username);
+        });
+
+        socket.on("typing-stop", () => {
+            setTyping(false);
+        });
+
         socket.on("users-count", (users) => {
             toastr.info(`There are ${users.length} players in the room`);
             setGameReady(users.length === 2);
@@ -299,9 +333,19 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                             </div>
 
                             <div className="text-sm font-normal">
-                                {playerTurn === inRoom.player
-                                    ? "Your turn"
-                                    : "Waiting for other player to play"}
+                                {playerTurn === inRoom.player ? (
+                                    <div className="flex justify-center items-center">
+                                        <FontAwesomeIcon icon={faCheck} />
+                                        <span className="ml-2">Your turn</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-center items-center">
+                                        <FontAwesomeIcon icon={faXmark} />{" "}
+                                        <span className="ml-2">
+                                            Opponent's turn
+                                        </span>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -310,13 +354,21 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                 className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md w-full"
                                 onClick={resetGame}
                             >
-                                {restartGameText}
+                                <div className="flex justify-center items-center">
+                                    <FontAwesomeIcon icon={faRotateRight} />
+                                    <span className="ml-2">
+                                        {restartGameText}
+                                    </span>
+                                </div>
                             </button>
                             <button
                                 className="bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded-md w-full"
                                 onClick={handleLeaveRoom}
                             >
-                                Leave Room
+                                <div className="flex justify-center items-center">
+                                    <FontAwesomeIcon icon={faCircleXmark} />
+                                    <span className="ml-2">Leave room</span>
+                                </div>
                             </button>
                         </div>
                     </div>
@@ -351,7 +403,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                             }`}
                                         >
                                             <div
-                                                className={`bg-gray-200 rounded-lg py-2 px-4 w-1/2 
+                                                className={`bg-gray-200 rounded-lg py-2 px-4 w-1/2 word-wrap break-words
                                                 ${
                                                     message.username ===
                                                     inRoom.player
@@ -388,15 +440,20 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                 </div>
                             </div>
                             <div className="flex flex-col h-full">
-                                <div className="flex items-center mt-4">
+                                {typing && (
+                                    <div className="text-sm font-sm text-gray-500">
+                                        {typing} is typing...
+                                    </div>
+                                )}
+                                <div className="flex items-center mt-2">
                                     <input
                                         type="text"
                                         className="flex-grow bg-gray-200 rounded-lg py-2 px-4 focus:outline-none w-full"
                                         placeholder="Enter your message..."
                                         value={message}
-                                        onChange={(e) =>
-                                            setMessage(e.target.value)
-                                        }
+                                        onChange={(e) => {
+                                            setMessage(e.target.value);
+                                        }}
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter")
                                                 sendMessage();
@@ -406,7 +463,12 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                         className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-2"
                                         onClick={sendMessage}
                                     >
-                                        Send
+                                        <div className="flex items-center">
+                                            <FontAwesomeIcon
+                                                icon={faPaperPlane}
+                                            />
+                                            <span className="ml-2">Send</span>
+                                        </div>
                                     </button>
                                 </div>
                             </div>
