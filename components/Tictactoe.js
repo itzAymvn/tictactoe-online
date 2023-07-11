@@ -32,6 +32,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         O: 0,
     });
 
+    // Keep track of the typing state
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
             socket.emit("typing-stop", {
@@ -49,6 +50,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     }, [message]);
 
     useEffect(() => {
+        // End game event
         socket.on("end-game", () => {
             setGameReady(false);
             setInRoom({
@@ -65,20 +67,23 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             });
         });
 
+        // Update score event
         socket.on("update-score", (score) => {
             setScore(score);
         });
 
+        // Typing event
         socket.on("typing", (username) => {
             setTyping(username);
         });
 
+        // Stop typing event
         socket.on("typing-stop", () => {
             setTyping(false);
         });
 
+        // When users count changes event
         socket.on("users-count", (users) => {
-            toastr.info(`There are ${users.length} players in the room`);
             setGameReady(users.length === 2);
             setPlayers(users);
 
@@ -92,12 +97,13 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                 setBoard(initialBoard);
             }
         });
-        // When a user joins, let everyone know
+
+        // Player joined event
         socket.on("player-joined", (username) => {
             toastr.success(`${username} has joined the game`);
         });
 
-        // If server allows user to leave, set inRoom state
+        // Leave room event
         socket.on("left", () => {
             setInRoom({
                 status: false,
@@ -106,7 +112,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             });
         });
 
-        // If other user requests to restart, ask user if they want to restart
+        // Server restart game request event
         socket.on("restart-game-server-request", ({ username, room }) => {
             Swal.fire({
                 title: "Restart Game?",
@@ -133,7 +139,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             });
         });
 
-        // If other user accepts restart, restart game
+        // Opponent accepted restart game request event
         socket.on("restart-game-accepted", () => {
             setBoard(initialBoard);
             setRestartGameText("Restart Game");
@@ -148,17 +154,18 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             ]);
         });
 
-        // If other user declines restart, let user know
+        // Opponent declined restart game request event
         socket.on("restart-game-declined", (username) => {
             setRestartGameText("Restart Game");
             toastr.error(`${username} has declined to restart the game`);
         });
 
-        // When a user leaves, let everyone know
+        // Someone left the game event
         socket.on("player-left", (name) => {
             toastr.error(`${name} has left the game`);
         });
 
+        // Update board event
         socket.on("update-board", ({ board, symbol }) => {
             setBoard(board);
         });
@@ -168,7 +175,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             setPlayerTurn(username);
         });
 
-        // When a user wins, let everyone know
+        // Winner event
         socket.on("winner", (player) => {
             if (player.username === inRoom.player) {
                 Swal.fire({
@@ -200,7 +207,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             }));
         });
 
-        // When a draw happens, let everyone know
+        // Draw event
         socket.on("draw", () => {
             Swal.fire({
                 title: "Draw!",
@@ -212,7 +219,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             });
         });
 
-        // When a message is sent, add it to the messages array
+        // New message event
         socket.on("new-message", ({ username, message, timestamp }) => {
             if (username !== inRoom.player) {
                 toastr.info(`${username} has sent a message`);
@@ -246,6 +253,10 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             socket.off("restart-game-declined");
             socket.off("users-count");
             socket.off("new-message");
+            socket.off("typing");
+            socket.off("typing-stop");
+            socket.off("end-game");
+            socket.off("update-score");
         };
     }, [
         setInRoom,
@@ -283,6 +294,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         });
     };
 
+    // Restart game (Only works if both players agree)
     const resetGame = () => {
         socket.emit("restart-game-request", {
             username: inRoom.player,
@@ -295,6 +307,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     return (
         <>
             {gameReady ? (
+                // If the game is ready (2 players in the room), show the game
                 <div className="min-h-screen flex justify-center items-center gap-4 sm:flex-row flex-col p-4 w-full">
                     <div className="bg-white rounded-lg shadow-lg p-6 md:w-1/2 lg:w-1/3">
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">
@@ -524,6 +537,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                     </div>
                 </div>
             ) : (
+                // Waiting for another player
                 <div className="min-h-screen  flex justify-center items-center">
                     <div className="w-72 bg-white rounded-lg shadow-lg p-6">
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">

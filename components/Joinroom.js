@@ -3,8 +3,6 @@
 import { useState, useContext, useEffect } from "react";
 import SocketContext from "@/context/SocketContext";
 import Swal from "sweetalert2";
-// import toastr from "toastr";
-// import "toastr/build/toastr.min.css";
 
 const Joinroom = ({ setInRoom }) => {
     const socket = useContext(SocketContext);
@@ -14,26 +12,30 @@ const Joinroom = ({ setInRoom }) => {
 
     // Request to join room
     const handleJoin = (e) => {
+        // Validate inputs
         if (username === "" || room === "") {
             alert("Please fill in all fields");
             return;
         }
 
+        // Check if username is not too long
         if (username.length > 10) {
             alert("Username must be less than 10 characters");
             return;
         }
 
+        // Check if username contains spaces
         if (username.split(" ").length > 1) {
             alert("Username must not contain spaces");
             return;
         }
 
+        // Request to join room
         socket.emit("join-room", { username, room });
     };
 
     useEffect(() => {
-        // If room is full, let user know
+        // Join room error event
         socket.on("join-room-error", (error) => {
             Swal.fire({
                 icon: "error",
@@ -42,7 +44,7 @@ const Joinroom = ({ setInRoom }) => {
             });
         });
 
-        // if server allows user to join, set inRoom state
+        // Joined room event
         socket.on("joined", ({ username, room, symbol }) => {
             setInRoom({
                 status: true,
@@ -51,6 +53,12 @@ const Joinroom = ({ setInRoom }) => {
                 symbol,
             });
         });
+
+        // Cleanup
+        return () => {
+            socket.off("join-room-error");
+            socket.off("joined");
+        };
     }, [setInRoom, socket]);
 
     return (
