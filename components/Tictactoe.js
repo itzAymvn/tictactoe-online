@@ -27,6 +27,10 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     const [messages, setMessages] = useState([]);
     const [message, setMessage] = useState("");
     const [typing, setTyping] = useState(false);
+    const [score, setScore] = useState({
+        X: 0,
+        O: 0,
+    });
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -45,6 +49,26 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     }, [message]);
 
     useEffect(() => {
+        socket.on("end-game", () => {
+            setGameReady(false);
+            setInRoom({
+                status: false,
+                room: null,
+                player: null,
+                symbol: null,
+            });
+            setBoard(initialBoard);
+
+            socket.emit("leave-room", {
+                username: inRoom.player,
+                room: inRoom.room,
+            });
+        });
+
+        socket.on("update-score", (score) => {
+            setScore(score);
+        });
+
         socket.on("typing", (username) => {
             setTyping(username);
         });
@@ -60,6 +84,10 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
             // If a user leaves, clear chat & board
             if (users.length === 1) {
+                setScore({
+                    X: 0,
+                    O: 0,
+                });
                 setMessages([]);
                 setBoard(initialBoard);
             }
@@ -99,6 +127,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                     socket.emit("restart-game-declined", {
                         username: inRoom.player,
                         room: inRoom.room,
+                        board: board,
                     });
                 }
             });
@@ -140,13 +169,13 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         });
 
         // When a user wins, let everyone know
-        socket.on("winner", (username) => {
-            if (username === inRoom.player) {
+        socket.on("winner", (player) => {
+            if (player.username === inRoom.player) {
                 Swal.fire({
                     title: "You Won!",
                     text: "Congratulations, you won the game",
                     icon: "success",
-                    confirmButtonText: "Ok",
+                    confirmButtonText: "Restart Game?",
                 }).then(() => {
                     resetGame();
                 });
@@ -158,11 +187,17 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                     title: "You Lost!",
                     text: "You lost the game",
                     icon: "error",
-                    confirmButtonText: "Ok",
+                    confirmButtonText: "Restart Game?",
                 }).then(() => {
                     resetGame();
                 });
             }
+
+            // We only the score of the player who won
+            setScore((score) => ({
+                ...score,
+                [player.symbol]: score[player.symbol] + 1,
+            }));
         });
 
         // When a draw happens, let everyone know
@@ -265,7 +300,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                         <div className="text-4xl font-bold text-center mb-4 text-gray-800">
                             XOXO
                             <div className="text-sm font-normal">
-                                Room: {inRoom.room} | Player: {inRoom.player}
+                                Room: {inRoom.room} | Online: {players.length}
                             </div>
                         </div>
 
@@ -288,7 +323,20 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                     <div className="text-2xl font-bold mr-2">
                                         {player.symbol}
                                     </div>
-                                    <div>{player.username}</div>
+                                    <div className="flex flex-col">
+                                        <div className="text-sm font-bold">
+                                            {player.username}
+                                        </div>
+                                        <div className="text-xs font-normal">
+                                            {player.symbol === "X"
+                                                ? score.X === 1
+                                                    ? score.X + " win"
+                                                    : score.X + " wins"
+                                                : score.O === 1
+                                                ? score.O + " win"
+                                                : score.O + " wins"}
+                                        </div>
+                                    </div>
                                 </div>
                             ))}
                         </div>
