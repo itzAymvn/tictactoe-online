@@ -20,7 +20,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
     const initialBoard = Array(9).fill("");
     const [board, setBoard] = useState(initialBoard);
-    const [restartGameText, setRestartGameText] = useState("Restart Game");
+    const [restartGame, setRestartGame] = useState(true);
     const [gameReady, setGameReady] = useState(false); // Updated to initialize as false
     const [playerTurn, setPlayerTurn] = useState("");
     const [players, setPlayers] = useState([]);
@@ -31,6 +31,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         X: 0,
         O: 0,
     });
+    const [messageDelay, setMessageDelay] = useState(0);
 
     // Keep track of the typing state
     useEffect(() => {
@@ -50,6 +51,11 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
     }, [message]);
 
     useEffect(() => {
+        // request users count
+        socket.emit("users-count-request", {
+            room: inRoom.room,
+        });
+
         // End game event
         socket.on("end-game", () => {
             setGameReady(false);
@@ -126,10 +132,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                     socket.emit("restart-game-accepted", {
                         room: room,
                     });
-                }
-
-                // If user declines, let other user know
-                else {
+                } else {
                     socket.emit("restart-game-declined", {
                         username: inRoom.player,
                         room: inRoom.room,
@@ -142,7 +145,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         // Opponent accepted restart game request event
         socket.on("restart-game-accepted", () => {
             setBoard(initialBoard);
-            setRestartGameText("Restart Game");
+            setRestartGame(true);
             toastr.success("Game has been restarted");
             setMessages((messages) => [
                 ...messages,
@@ -156,7 +159,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
 
         // Opponent declined restart game request event
         socket.on("restart-game-declined", (username) => {
-            setRestartGameText("Restart Game");
+            setRestartGame(true);
             toastr.error(`${username} has declined to restart the game`);
         });
 
@@ -186,10 +189,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                 }).then(() => {
                     resetGame();
                 });
-            }
-
-            // If user loses, let them know
-            else {
+            } else {
                 Swal.fire({
                     title: "You Lost!",
                     text: "You lost the game",
@@ -200,7 +200,6 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                 });
             }
 
-            // We only the score of the player who won
             setScore((score) => ({
                 ...score,
                 [player.symbol]: score[player.symbol] + 1,
@@ -267,12 +266,17 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         setGameReady,
         setPlayerTurn,
         setBoard,
-        restartGameText,
+        restartGame,
     ]);
 
     // Send message
     const sendMessage = () => {
         if (message.trim() === "") {
+            return;
+        }
+
+        if (messageDelay > 0) {
+            // Countdown instead of sending message
             return;
         }
 
@@ -284,6 +288,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
         });
 
         setMessage("");
+        setMessageDelay(3000); // Set delay of 3 seconds
     };
 
     // Request to leave room
@@ -301,8 +306,21 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
             room: inRoom.room,
         });
 
-        setRestartGameText("Waiting...");
+        setRestartGame(false);
     };
+
+    // Countdown effect for message delay
+    useEffect(() => {
+        if (messageDelay > 0) {
+            const timer = setTimeout(() => {
+                setMessageDelay(messageDelay - 1000);
+            }, 1000);
+
+            return () => {
+                clearTimeout(timer);
+            };
+        }
+    }, [messageDelay]);
 
     return (
         <>
@@ -322,16 +340,16 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                 <div
                                     key={index}
                                     className={`flex items-center bg-gray-200 rounded-lg p-2 w-1/2 justify-center
-                                ${
-                                    playerTurn === player.username
-                                        ? "border-2 border-blue-500"
-                                        : ""
-                                }
-                                ${
-                                    player.symbol === "X"
-                                        ? "text-blue-900"
-                                        : "text-red-500"
-                                }`}
+                            ${
+                                playerTurn === player.username
+                                    ? "border-2 border-blue-500"
+                                    : ""
+                            }
+                            ${
+                                player.symbol === "X"
+                                    ? "text-blue-900"
+                                    : "text-red-500"
+                            }`}
                                 >
                                     <div className="text-2xl font-bold mr-2">
                                         {player.symbol}
@@ -364,6 +382,7 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                     }`}
                                     // If it's the player's turn, allow them to click
                                     onClick={() => {
+                                        if (!restartGame) return;
                                         if (playerTurn !== inRoom.player)
                                             return;
 
@@ -418,7 +437,9 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                 <div className="flex justify-center items-center">
                                     <FontAwesomeIcon icon={faRotateRight} />
                                     <span className="ml-2">
-                                        {restartGameText}
+                                        {restartGame
+                                            ? "Restart game"
+                                            : "Waiting..."}
                                     </span>
                                 </div>
                             </button>
@@ -452,16 +473,17 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                         <div
                                             key={index}
                                             className={`flex items-center mb-4 w-full
-                                            ${
-                                                message.username === "Server" &&
-                                                "justify-center"
-                                            }
-                                            ${
-                                                message.username ===
-                                                inRoom.player
-                                                    ? "justify-start"
-                                                    : "justify-end"
-                                            }`}
+                                                ${
+                                                    message.username ===
+                                                        "Server" &&
+                                                    "justify-center"
+                                                }
+                                                ${
+                                                    message.username ===
+                                                    inRoom.player
+                                                        ? "justify-start"
+                                                        : "justify-end"
+                                                }`}
                                         >
                                             <div
                                                 className={`bg-gray-200 rounded-lg py-2 px-4 w-1/2 word-wrap break-words
@@ -521,14 +543,29 @@ const TicTacToe = ({ inRoom, setInRoom }) => {
                                         }}
                                     />
                                     <button
-                                        className="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-2"
+                                        className={`bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md ml-2 ${
+                                            messageDelay > 0
+                                                ? "cursor-not-allowed"
+                                                : ""
+                                        }`}
                                         onClick={sendMessage}
+                                        disabled={messageDelay > 0}
                                     >
-                                        <div className="flex items-center">
-                                            <FontAwesomeIcon
-                                                icon={faPaperPlane}
-                                            />
-                                            <span className="ml-2">Send</span>
+                                        <div className="flex justify-center">
+                                            {messageDelay > 0 ? (
+                                                <div className="animate-pulse">
+                                                    {messageDelay / 1000}s
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <FontAwesomeIcon
+                                                        icon={faPaperPlane}
+                                                    />
+                                                    <span className="ml-2">
+                                                        Send
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </button>
                                 </div>

@@ -72,13 +72,15 @@ const Joinroom = ({ setInRoom }) => {
             setRooms(rooms);
         });
 
+        socket.emit("list-rooms");
+
         // Cleanup
         return () => {
             socket.off("join-room-error");
             socket.off("joined");
             socket.off("rooms");
         };
-    }, [setInRoom, socket]);
+    }, []);
 
     return (
         <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md mx-auto">
@@ -144,51 +146,77 @@ const Joinroom = ({ setInRoom }) => {
                             type="button"
                             onClick={() => {
                                 setShowRooms((prev) => !prev);
+                                if (rooms.length === 0) {
+                                    socket.emit("list-rooms");
+                                }
                             }}
                         >
                             Show Available Rooms
                         </button>
                     </div>
-                    {rooms.length > 0 && showRooms && (
-                        <div className="mt-6 max-h-64 overflow-y-auto">
-                            <h2 className="text-2xl font-bold text-center mb-4 text-gray-800">
-                                Available Rooms
-                            </h2>
-                            {rooms.map((room, index) => (
-                                <div
-                                    key={index}
-                                    className="bg-gray-200 p-4 rounded flex items-center justify-between mb-4"
-                                >
-                                    <div className="text-gray-700 font-bold">
-                                        {room.room}
-                                    </div>
-                                    <div className="text-gray-500">
-                                        {room.players} players
-                                    </div>
-                                    <button
-                                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                                        type="button"
-                                        onClick={() => {
-                                            if (username === "") {
-                                                Swal.fire({
-                                                    icon: "error",
-                                                    title: "Oops...",
-                                                    text: "Please fill in all fields",
-                                                });
+                    {showRooms && (
+                        <>
+                            {rooms.length > 0 ? (
+                                <div className="mt-6 max-h-64 overflow-y-auto">
+                                    <h2 className="text-2xl font-bold text-center mb-4 text-gray-800">
+                                        Available Rooms
+                                    </h2>
+                                    {rooms.map((room, index) => (
+                                        <div
+                                            key={index}
+                                            className="bg-gray-200 p-4 rounded flex items-center justify-between mb-4"
+                                        >
+                                            <div className="text-gray-700 font-bold">
+                                                {room.room}
+                                            </div>
+                                            <div className="text-gray-500">
+                                                {room.players} players
+                                            </div>
+                                            {room.players < 2 ? (
+                                                <button
+                                                    className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (username === "") {
+                                                            Swal.fire({
+                                                                icon: "error",
+                                                                title: "Oops...",
+                                                                text: "Please fill in all fields",
+                                                            });
 
-                                                return;
-                                            }
-                                            socket.emit("join-room", {
-                                                username,
-                                                room: room.room,
-                                            });
-                                        }}
-                                    >
-                                        Join
-                                    </button>
+                                                            return;
+                                                        }
+                                                        socket.emit(
+                                                            "join-room",
+                                                            {
+                                                                username,
+                                                                room: room.room,
+                                                            }
+                                                        );
+                                                    }}
+                                                >
+                                                    Join
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    className="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                                                    type="button"
+                                                    disabled
+                                                >
+                                                    Full
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            ) : (
+                                <div className="mt-6">
+                                    <h2 className="text-2xl font-bold text-center mb-4 text-gray-800">
+                                        No Available Rooms
+                                    </h2>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

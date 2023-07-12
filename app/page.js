@@ -8,6 +8,7 @@ const socket = io(process.env.NEXT_PUBLIC_GAME_SERVER);
 
 const page = () => {
     const [isConnected, setIsConnected] = useState(false);
+    const [serverError, setServerError] = useState(false);
     const [inRoom, setInRoom] = useState({
         status: false,
         room: null,
@@ -18,6 +19,12 @@ const page = () => {
     useEffect(() => {
         socket.on("connect", () => {
             setIsConnected(true);
+        });
+
+        // if the server is down or the client is disconnected from the server
+        socket.on("connect_error", () => {
+            setServerError(true);
+            setIsConnected(false);
         });
 
         socket.on("disconnect", () => {
@@ -33,7 +40,26 @@ const page = () => {
     return (
         <SocketContext.Provider value={socket}>
             <div className="bg-gradient-radial from-blue-400 to-purple-900 min-h-screen w-full p-4">
-                {isConnected ? (
+                {serverError ? (
+                    // If the server is down
+                    <div className="flex justify-center items-center min-h-screen">
+                        <div className="flex flex-col items-center w-1/2 md:w-1/3 lg:w-1/4">
+                            <h1 className="text-4xl text-white font-bold mb-4">
+                                Server is down
+                            </h1>
+                            <p className="text-white mb-4">
+                                The server is currently down. Please try again
+                                later.
+                            </p>
+                            <button
+                                className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                                onClick={() => window.location.reload()}
+                            >
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                ) : isConnected ? (
                     // If the client is connected to the server
                     <>
                         {inRoom.status ? (
